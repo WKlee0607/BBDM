@@ -20,8 +20,9 @@ class CustomSingleDataset(Dataset):
         image_paths = get_image_paths_from_dir(os.path.join(dataset_config.dataset_path, stage))
         self.flip = dataset_config.flip if stage == 'train' else False
         self.to_normal = dataset_config.to_normal
+        self.train = True if stage == 'train' else False
 
-        self.imgs = ImagePathDataset(image_paths, self.image_size, flip=self.flip, to_normal=self.to_normal)
+        self.imgs = ImagePathDataset(image_paths, self.image_size, flip=self.flip, to_normal=self.to_normal, train=self.train)
 
     def __len__(self):
         return len(self.imgs)
@@ -39,9 +40,10 @@ class CustomAlignedDataset(Dataset):
         image_paths_cond = get_image_paths_from_dir(os.path.join(dataset_config.dataset_path, f'{stage}/A'))
         self.flip = dataset_config.flip if stage == 'train' else False
         self.to_normal = dataset_config.to_normal
+        self.train = True if stage == 'train' else False
 
-        self.imgs_ori = ImagePathDataset(image_paths_ori, self.image_size, flip=self.flip, to_normal=self.to_normal)
-        self.imgs_cond = ImagePathDataset(image_paths_cond, self.image_size, flip=self.flip, to_normal=self.to_normal)
+        self.imgs_ori = ImagePathDataset(image_paths_ori, self.image_size, flip=self.flip, to_normal=self.to_normal, train=self.train)
+        self.imgs_cond = ImagePathDataset(image_paths_cond, self.image_size, flip=self.flip, to_normal=self.to_normal, train=self.train)
 
     def __len__(self):
         return len(self.imgs_ori)

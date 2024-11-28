@@ -1,0 +1,6 @@
+/results
+/.vscode
+
+/model/BrownianBridge/base/modules/diffusionmodules/__pycache__
+/model/BrownianBridge/base/modules/diffusionmodules/__pycache__
+/model/BrownianBridge/base/modules/image_degradation/utils/test.png
