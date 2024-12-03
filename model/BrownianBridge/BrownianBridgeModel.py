@@ -209,17 +209,17 @@ class BrownianBridgeModel(nn.Module):
 
         if sample_mid_step:
             imgs, one_step_imgs = [y], []
-            for i in tqdm(range(len(self.steps)), desc=f'sampling loop time step', total=len(self.steps)):
+            for i in tqdm(range(len(self.steps)), desc=f'sampling loop time step', total=len(self.steps), disable=True):
                 img, x0_recon = self.p_sample(x_t=imgs[-1], y=y, context=context, i=i, clip_denoised=clip_denoised)
                 imgs.append(img)
                 one_step_imgs.append(x0_recon)
             return imgs, one_step_imgs
         else:
             img = y
-            for i in tqdm(range(len(self.steps)), desc=f'sampling loop time step', total=len(self.steps)):
+            for i in tqdm(range(len(self.steps)), desc=f'sampling loop time step', total=len(self.steps), disable=True):
                 img, _ = self.p_sample(x_t=img, y=y, context=context, i=i, clip_denoised=clip_denoised)
             return img
 
     @torch.no_grad()
     def sample(self, y, context=None, clip_denoised=True, sample_mid_step=False):
-        return self.p_sample_loop(y, context, clip_denoised, sample_mid_step)
+        return self.p_sample_loop(y, context, clip_denoised, sample_mid_step) # y = x_cond

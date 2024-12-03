@@ -44,8 +44,8 @@ class ImagePathDataset(Dataset):
         except BaseException as e:
             print(img_path)
         
-        #if image.ndim == 2:
-        #    image = np.repeat(np.expand_dims(image, axis=-1), 3, axis=-1)
+        if image.ndim == 2:
+            image = np.repeat(np.expand_dims(image, axis=-1), 3, axis=-1)
 
         image = transform(image) # CHW
 

@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH -J BBDM
+#SBATCH -J BBDM-b8
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-gpu=8
 #SBATCH --mem-per-gpu=32G

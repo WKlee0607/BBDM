@@ -82,3 +82,10 @@ def get_image_grid(batch, grid_size=4, to_normal=True):
         image_grid = image_grid.mul_(0.5).add_(0.5).clamp_(0, 1.)
     image_grid = image_grid.mul_(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to('cpu', torch.uint8).numpy()
     return image_grid
+
+@torch.no_grad()
+def dBZ_to_mmhr(x):
+    dBZ = x*35 + 25
+    Z = 10.0 ** (dBZ / 10.0)
+    R = (Z / 200) ** (1 / 1.6) # mm/hr 단위
+    return R

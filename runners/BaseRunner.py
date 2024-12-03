@@ -248,6 +248,56 @@ class BaseRunner(ABC):
         self.restore_ema()
         return average_loss
 
+    def validation_epoch_add(self, val_loader, epoch):
+        self.apply_ema()
+        self.net.eval()
+
+        pbar = tqdm(val_loader, total=len(val_loader), smoothing=0.01, disable=not self.is_main_process)
+        step = 0
+        dloss_sum = {'RMSE': 0., 'POD': 0., 'FAR': 0., 'CSI': 0.}
+        loss_sum = {'RMSE': 0., 'POD': 0., 'FAR': 0., 'CSI': 0.}
+
+        for val_batch in pbar:
+            loss = self.eval_fn(net=self.net,
+                                batch=val_batch,
+                                epoch=epoch,
+                                step=step,
+                                opt_idx=0,
+                                stage='val',
+                                write=False)
+            for key in loss_sum:
+                loss_sum[key] += loss[key]
+            if len(self.optimizer) > 1:
+                loss = self.eval_fn(net=self.net,
+                                    batch=val_batch,
+                                    epoch=epoch,
+                                    step=step,
+                                    opt_idx=1,
+                                    stage='val',
+                                    write=False)
+                for key in dloss_sum:
+                    dloss_sum[key] += loss[key]
+            step += 1
+        
+        # processing loss
+        for key in loss_sum:
+            loss_sum[key] /= step
+        loss_sum['RMSE'] = torch.sqrt(loss_sum['RMSE'])
+
+        
+        # average_loss = loss_sum / step
+        if self.is_main_process:
+            for key in loss_sum:
+                self.writer.add_scalar(f'{key}: val_epoch/loss', loss_sum[key], epoch)
+            if len(self.optimizer) > 1:
+                for key in dloss_sum:
+                    dloss_sum[key] /= step
+                    self.writer.add_scalar(f'{key}: d_val_epoch/loss', loss_sum[key], epoch)
+        self.restore_ema()
+        return loss_sum
+
+
+
     @torch.no_grad()
     def sample_step(self, train_batch, val_batch):
         self.apply_ema()
@@ -299,6 +349,23 @@ class BaseRunner(ABC):
         :return: a scalar of loss
         """
         pass
+
+    @abstractmethod 
+    def eval_fn(self, net, batch, epoch, step, opt_idx=0, stage='train', write=True):
+        """
+        loss function
+        :param net: nn.Module
+        :param batch: batch
+        :param epoch: global epoch
+        :param step: global step
+        :param opt_idx: optimizer index, default is 0; set it to 1 for GAN discriminator
+        :param stage: train, val, test
+        :param write: write loss information to SummaryWriter
+        :return: a scalar of loss
+        """
+        pass
+
+
 
     @abstractmethod
     def sample(self, net, batch, sample_path, stage='train'):
@@ -396,6 +463,7 @@ class BaseRunner(ABC):
                 self.global_epoch = epoch
                 start_time = time.time()
                 for train_batch in pbar:
+                    #continue
                     self.global_step += 1
                     self.net.train()
 
@@ -464,10 +532,11 @@ class BaseRunner(ABC):
                         epoch + 1) == self.config.training.n_epochs:
                     # if self.is_main_process == 0:
                     with torch.no_grad():
-                        self.logger("validating epoch...") 
-                        average_loss = self.validation_epoch(val_loader, epoch) # validation -> 여기에 평가 코드 작성
+                        self.logger("per epoch validating epoch...") 
+                        average_loss = self.validation_epoch(val_loader, epoch) # validation 
+                        add_loss = self.validation_epoch_add(val_loader, epoch) # validation - RMSE, POD, FAR, CSI
                         torch.cuda.empty_cache()
-                        self.logger("validating epoch success")
+                        self.logger("per epoch validating epoch success")
 
                 # save checkpoint
                 if (epoch + 1) % self.config.training.save_interval == 0 or \

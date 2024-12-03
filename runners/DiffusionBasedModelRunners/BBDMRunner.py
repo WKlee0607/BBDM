@@ -3,6 +3,7 @@ import os
 import torch.optim.lr_scheduler
 from torch.utils.data import DataLoader
 
+from ..utils import dBZ_to_mmhr
 from PIL import Image
 from Register import Registers
 from model.BrownianBridge.BrownianBridgeModel import BrownianBridgeModel
@@ -161,6 +162,42 @@ class BBDMRunner(DiffusionBaseRunner):
         self.logger(self.net.cond_latent_mean)
         self.logger(self.net.cond_latent_std)
 
+    def eval_fn(self, net, batch, epoch, step, opt_idx=0, stage='train', write=True):
+        (x, x_name), (x_cond, x_cond_name) = batch
+        x = x.to(self.config.training.device[0]) # B - output
+        x_cond = x_cond.to(self.config.training.device[0]) # A - input
+
+        x0_recon = net.p_sample_loop(x_cond, context = None, clip_denoised=self.config.testing.clip_denoised, sample_mid_step=False) # pred 결과
+        # validation인 경우.
+        if stage != 'train':
+            ## RMSE - x랑 계산해야함.
+            b, c, h, w = x0_recon.shape
+            #print("x shape :", x.shape) # [B, 3, 256, 256]
+            #print("x0_recon shape: ", x0_recon.shape) # [B, 3, 256, 256]
+            x = x.mean(dim=1) # [B, H, W]
+            x0_recon = x0_recon.mean(dim=1) # [B, H, W]
+            RMSE = torch.mean(torch.sum((x - x0_recon)**2, dim=(1, 2)), dim=0)  # [B,]
+
+            ## POD, FAR, CSI 출력 - threshold = 0.1
+            # convert hh/mr
+            x0_recon_mmhr = dBZ_to_mmhr(x0_recon) # [B, H, W]
+            x_mmhr = dBZ_to_mmhr(x) # [B, H, W]
+
+            pred = x0_recon_mmhr > 0.1 # Boolean tensor
+            gt = x_mmhr > 0.1 # Boolean tensor
+            TP = torch.mean(torch.sum(pred.float() * gt.float(), dim=(1, 2)), dim=0) 
+            FP = torch.mean(torch.sum(pred.float() * (~gt).float(), dim=(1, 2)), dim=0) 
+            FN = torch.mean(torch.sum((~pred).float() * gt.float(), dim=(1,2)), dim=0)
+
+            POD = TP / (TP + FN) if (TP + FN) > 0 else 0.0
+            FAR = FP / (TP + FP) if (TP + FP) > 0 else 0.0
+            CSI = TP / (TP + FP + FN) if (TP + FP + FN) > 0 else 0.0
+
+            add_loss = {'RMSE': RMSE, 'POD': POD, 'FAR': FAR, 'CSI': CSI}
+
+            return add_loss
+        
+
     def loss_fn(self, net, batch, epoch, step, opt_idx=0, stage='train', write=True):
         (x, x_name), (x_cond, x_cond_name) = batch
         x = x.to(self.config.training.device[0]) # B - output
@@ -173,22 +210,6 @@ class BBDMRunner(DiffusionBaseRunner):
                 self.writer.add_scalar(f'recloss_noise/{stage}', additional_info['recloss_noise'], step)
             if additional_info.__contains__('recloss_xy'):
                 self.writer.add_scalar(f'recloss_xy/{stage}', additional_info['recloss_xy'], step)
-
-        # validation인 경우.
-        if stage != 'train':
-            x0_recon = additional_info['x0_recon'] # pred 결과
-            # RMSE - x랑 계산해야함.
-            b, c, h, w = x0_recon.shape
-            RMSE = (x.mean(dim=1) - x0_recon.mean(dim=1)).mean(dim=0, keepdim=True) # batch 별로 loss 출력
-
-            # POD, FAR, CSI 출력 - threshold = 0.1
-            # convert [-1,1] -> []
-
-
-
-            #add_loss = {'RMSE': RMSE, 'POD': POD, 'FAR': FAR, 'CSI': CSI}
-
-            return loss, add_loss
 
         return loss
 
