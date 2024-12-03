@@ -163,8 +163,8 @@ class BBDMRunner(DiffusionBaseRunner):
 
     def loss_fn(self, net, batch, epoch, step, opt_idx=0, stage='train', write=True):
         (x, x_name), (x_cond, x_cond_name) = batch
-        x = x.to(self.config.training.device[0])
-        x_cond = x_cond.to(self.config.training.device[0])
+        x = x.to(self.config.training.device[0]) # B - output
+        x_cond = x_cond.to(self.config.training.device[0]) # A - input
 
         loss, additional_info = net(x, x_cond)
         if write and self.is_main_process:
@@ -173,6 +173,23 @@ class BBDMRunner(DiffusionBaseRunner):
                 self.writer.add_scalar(f'recloss_noise/{stage}', additional_info['recloss_noise'], step)
             if additional_info.__contains__('recloss_xy'):
                 self.writer.add_scalar(f'recloss_xy/{stage}', additional_info['recloss_xy'], step)
+
+        # validation인 경우.
+        if stage != 'train':
+            x0_recon = additional_info['x0_recon'] # pred 결과
+            # RMSE - x랑 계산해야함.
+            b, c, h, w = x0_recon.shape
+            RMSE = (x.mean(dim=1) - x0_recon.mean(dim=1)).mean(dim=0, keepdim=True) # batch 별로 loss 출력
+
+            # POD, FAR, CSI 출력 - threshold = 0.1
+            # convert [-1,1] -> []
+
+
+
+            #add_loss = {'RMSE': RMSE, 'POD': POD, 'FAR': FAR, 'CSI': CSI}
+
+            return loss, add_loss
+
         return loss
 
     @torch.no_grad()

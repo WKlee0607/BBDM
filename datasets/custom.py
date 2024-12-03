@@ -49,7 +49,7 @@ class CustomAlignedDataset(Dataset):
         return len(self.imgs_ori)
 
     def __getitem__(self, i):
-        return self.imgs_ori[i], self.imgs_cond[i]
+        return self.imgs_ori[i], self.imgs_cond[i] # B, A -> g.t는 B
 
 
 @Registers.datasets.register_with_name('custom_colorization_LAB')

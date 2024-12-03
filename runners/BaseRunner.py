@@ -402,6 +402,7 @@ class BaseRunner(ABC):
                     losses = []
                     for i in range(len(self.optimizer)):
                         # pdb.set_trace()
+                        ## loss's grad 계산
                         loss = self.loss_fn(net=self.net,
                                             batch=train_batch,
                                             epoch=epoch,
@@ -410,6 +411,8 @@ class BaseRunner(ABC):
                                             stage='train')
 
                         loss.backward()
+
+                        ## accumulate_grad_baches = 4임. 4번의 iter마다 Update. 
                         if self.global_step % accumulate_grad_batches == 0:
                             self.optimizer[i].step()
                             self.optimizer[i].zero_grad()
@@ -437,10 +440,11 @@ class BaseRunner(ABC):
                             )
                         )
 
+                    ## 한 번의 배치마다 동작
                     with torch.no_grad():
                         if self.global_step % 50 == 0:
                             val_batch = next(iter(val_loader))
-                            self.validation_step(val_batch=val_batch, epoch=epoch, step=self.global_step)
+                            self.validation_step(val_batch=val_batch, epoch=epoch, step=self.global_step) 
 
                         if self.global_step % int(self.config.training.sample_interval * epoch_length) == 0:
                             # val_batch = next(iter(val_loader))
@@ -455,13 +459,13 @@ class BaseRunner(ABC):
                 elapsed_rounded = int(round((end_time-start_time)))
                 self.logger("training time: " + str(datetime.timedelta(seconds=elapsed_rounded)))
 
-                # validation
+                # validation - 한 에포크마다 동작
                 if (epoch + 1) % self.config.training.validation_interval == 0 or (
                         epoch + 1) == self.config.training.n_epochs:
                     # if self.is_main_process == 0:
                     with torch.no_grad():
-                        self.logger("validating epoch...")
-                        average_loss = self.validation_epoch(val_loader, epoch)
+                        self.logger("validating epoch...") 
+                        average_loss = self.validation_epoch(val_loader, epoch) # validation -> 여기에 평가 코드 작성
                         torch.cuda.empty_cache()
                         self.logger("validating epoch success")
 
